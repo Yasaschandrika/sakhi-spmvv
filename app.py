@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, jsonify
-from google import genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 import os
+import random
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -14,10 +15,9 @@ API_KEYS = [
     os.getenv("GEMINI_API_KEY"),
     os.getenv("GEMINI_API_KEY2")
 ]
+genai.configure(api_key=random.choice(API_KEYS))
+model = genai.GenerativeModel("gemini-2.0-flash")
 
-
-import random
-client = genai.Client(api_key=random.choice(API_KEYS))
 from data import SPMVV_DATA
 
 SYSTEM_PROMPT = f"""
@@ -96,10 +96,7 @@ def chat():
             else:
                 return jsonify({"reply": "❌ Sorry, could not send complaint right now. Please try again later or contact the hostel office directly."})
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=SYSTEM_PROMPT + "\n\nStudent asks: " + user_message
-        )
+        response = model.generate_content(SYSTEM_PROMPT + "\n\nStudent asks: " + user_message)
         return jsonify({"reply": response.text})
     except Exception as e:
         return jsonify({"reply": f"Error: {str(e)}"})
