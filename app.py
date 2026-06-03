@@ -11,9 +11,9 @@ load_dotenv()
 app = Flask(__name__)
 
 API_KEYS = [
-    "AQ.Ab8RN6Im3Mo4Qh_paEQwZ9dr4f28043R91EtVCntT2VVVbRVcg",
+    "AQ.Ab8RN6KhjnA3wEkj9r-kXN12nS0F1JXqjI1E0RPZDAjFLr_Iyg",
     ""
-    "AQ.Ab8RN6K38XcNknfhPlCzhK-5iVU3KXRozcf2Ce17PeM02DL8sg"
+    "AQ.Ab8RN6KGc9cPB0CxXo8Uktl7wJ2Ba6yrVqLFXSndm0q_CZU-Sg"
 ]
 
 import random
