@@ -1,22 +1,16 @@
 from flask import Flask, render_template, request, jsonify
-import google.generativeai as genai
 from dotenv import load_dotenv
 import os
-import random
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from groq import Groq
 
 load_dotenv()
 
 app = Flask(__name__)
 
-API_KEYS = [
-    os.getenv("GEMINI_API_KEY"),
-    os.getenv("GEMINI_API_KEY2")
-]
-genai.configure(api_key=random.choice(API_KEYS))
-model = genai.GenerativeModel("gemini-2.0-flash")
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 from data import SPMVV_DATA
 
@@ -96,8 +90,14 @@ def chat():
             else:
                 return jsonify({"reply": "❌ Sorry, could not send complaint right now. Please try again later or contact the hostel office directly."})
 
-        response = model.generate_content(SYSTEM_PROMPT + "\n\nStudent asks: " + user_message)
-        return jsonify({"reply": response.text})
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ]
+        )
+        return jsonify({"reply": response.choices[0].message.content})
     except Exception as e:
         return jsonify({"reply": f"Error: {str(e)}"})
 
