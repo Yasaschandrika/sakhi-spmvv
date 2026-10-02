@@ -8,7 +8,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-client = Groq(api_key=os.getenv("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"))
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 from data import SPMVV_DATA
 
@@ -38,16 +38,17 @@ UNIVERSITY DATA:
 
 
 def send_complaint_email(complaint_text):
-    """Send the complaint using Brevo's HTTPS API (works on Render free tier,
-    unlike SMTP which is blocked)."""
+    """Send complaint via Brevo HTTPS API (SMTP is blocked on Render free tier).
+    Returns (success: bool, reason: str)."""
     api_key = os.getenv("BREVO_API_KEY")
     sender = os.getenv("SENDER_EMAIL")
-    # COMPLAINT_TO_EMAIL is preferred; RECEIVER_EMAIL still works if already set
     receiver = os.getenv("COMPLAINT_TO_EMAIL") or os.getenv("RECEIVER_EMAIL")
 
-    if not (api_key and sender and receiver):
-        print("Complaint email: missing BREVO_API_KEY / SENDER_EMAIL / COMPLAINT_TO_EMAIL")
-        return False
+    missing = [n for n, v in [("BREVO_API_KEY", api_key),
+                              ("SENDER_EMAIL", sender),
+                              ("COMPLAINT_TO_EMAIL", receiver)] if not v]
+    if missing:
+        return False, "missing variables: " + ", ".join(missing)
 
     body = f"""Dear Hostel Office,
 
@@ -60,7 +61,6 @@ Please look into this matter at the earliest.
 Regards,
 SAKHI — SPMVV Campus Assistant
 """
-
     try:
         r = httpx.post(
             "https://api.brevo.com/v3/smtp/email",
@@ -78,12 +78,10 @@ SAKHI — SPMVV Campus Assistant
             timeout=10,
         )
         if r.status_code in (200, 201):
-            return True
-        print(f"Brevo error: {r.status_code} {r.text}")
-        return False
+            return True, ""
+        return False, f"Brevo {r.status_code}: {r.text[:200]}"
     except Exception as e:
-        print(f"Email error: {e}")
-        return False
+        return False, f"{type(e).__name__}: {e}"
 
 
 @app.route("/")
@@ -98,11 +96,13 @@ def chat():
 
     try:
         if is_complaint:
-            success = send_complaint_email(user_message)
+            success, reason = send_complaint_email(user_message)
             if success:
                 return jsonify({"reply": "✅ Your complaint has been submitted anonymously to the hostel office! They will look into it shortly. Stay strong! 🌸"})
             else:
-                return jsonify({"reply": "❌ Sorry, could not send complaint right now. Please try again later or contact the hostel office directly."})
+                print("Complaint failed:", reason, flush=True)
+                # DEBUG: reason shown in chat. Remove "(Reason: ...)" once it works.
+                return jsonify({"reply": f"❌ Sorry, could not send complaint right now. (Reason: {reason})"})
 
         response = client.chat.completions.create(
             model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
