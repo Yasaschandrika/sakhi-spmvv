@@ -1,16 +1,14 @@
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import httpx
 from groq import Groq
 
 load_dotenv()
 
 app = Flask(__name__)
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = Groq(api_key=os.getenv("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"))
 
 from data import SPMVV_DATA
 
@@ -38,19 +36,20 @@ UNIVERSITY DATA:
 {SPMVV_DATA}
 """
 
+
 def send_complaint_email(complaint_text):
-    try:
-        sender = os.getenv("SENDER_EMAIL")
-        password = os.getenv("SENDER_PASSWORD")
-        receiver = os.getenv("RECEIVER_EMAIL")
+    """Send the complaint using Brevo's HTTPS API (works on Render free tier,
+    unlike SMTP which is blocked)."""
+    api_key = os.getenv("BREVO_API_KEY")
+    sender = os.getenv("SENDER_EMAIL")
+    # COMPLAINT_TO_EMAIL is preferred; RECEIVER_EMAIL still works if already set
+    receiver = os.getenv("COMPLAINT_TO_EMAIL") or os.getenv("RECEIVER_EMAIL")
 
-        msg = MIMEMultipart()
-        msg["From"] = sender
-        msg["To"] = receiver
-        msg["Subject"] = "SAKHI — Anonymous Student Complaint"
+    if not (api_key and sender and receiver):
+        print("Complaint email: missing BREVO_API_KEY / SENDER_EMAIL / COMPLAINT_TO_EMAIL")
+        return False
 
-        body = f"""
-Dear Hostel Office,
+    body = f"""Dear Hostel Office,
 
 An anonymous complaint has been submitted through SAKHI Campus Assistant:
 
@@ -60,22 +59,37 @@ Please look into this matter at the earliest.
 
 Regards,
 SAKHI — SPMVV Campus Assistant
-        """
-        msg.attach(MIMEText(body, "plain"))
+"""
 
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(sender, password)
-        server.sendmail(sender, receiver, msg.as_string())
-        server.quit()
-        return True
+    try:
+        r = httpx.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "api-key": api_key,
+                "accept": "application/json",
+                "content-type": "application/json",
+            },
+            json={
+                "sender": {"name": "SAKHI", "email": sender},
+                "to": [{"email": receiver}],
+                "subject": "SAKHI — Anonymous Student Complaint",
+                "textContent": body,
+            },
+            timeout=10,
+        )
+        if r.status_code in (200, 201):
+            return True
+        print(f"Brevo error: {r.status_code} {r.text}")
+        return False
     except Exception as e:
         print(f"Email error: {e}")
         return False
 
+
 @app.route("/")
 def home():
     return render_template("index.html")
+
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -100,6 +114,7 @@ def chat():
         return jsonify({"reply": response.choices[0].message.content})
     except Exception as e:
         return jsonify({"reply": f"Error: {str(e)}"})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
