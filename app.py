@@ -91,7 +91,7 @@ def chat():
                 return jsonify({"reply": "❌ Sorry, could not send complaint right now. Please try again later or contact the hostel office directly."})
 
         response = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
